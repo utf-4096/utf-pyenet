@@ -26,10 +26,6 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-          - os: windows-latest
-          - os: macos-latest
-          - os: ubuntu-latest
-            arch: aarch64
 
     steps:
       - uses: actions/checkout@v6
@@ -77,7 +73,9 @@ jobs:
     name: Publish to ${{ inputs.target || 'pypi' }}
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target || 'pypi' }}
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/utf-pyenet
     permissions:
       id-token: write
     steps:
