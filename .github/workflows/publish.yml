@@ -1,93 +1,31 @@
-name: Publish to PyPI
+name: Pypi Release
 
 on:
   release:
-    types: [published]
+    types:
+      - published
   workflow_dispatch:
-    inputs:
-      target:
-        description: 'Publish target'
-        required: true
-        default: 'pypi'
-        type: choice
-        options:
-          - testpypi
-          - pypi
-      verbose:
-        description: 'Enable verbose output'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   build_wheels:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-          - os: windows-latest
-          - os: macos-latest
-          - os: ubuntu-latest
-            arch: aarch64
+    uses: ./.github/workflows/wheels.yml
 
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-
-      - name: Set up QEMU
-        if: matrix.arch == 'aarch64'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Build
-        uses: pypa/cibuildwheel@v2.22
-        env:
-          CIBW_BUILD_FRONTEND: "build"
-          CIBW_SKIP: "pp*"
-          CIBW_ARCHS_LINUX: ${{ matrix.arch || 'x86_64' }}
-        with:
-          output-dir: wheelhouse
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v6
-        with:
-          name: python-wheel-${{ matrix.os }}-${{ matrix.arch || 'native' }}
-          path: ./wheelhouse/*.whl
-
-  build_sdist:
-    name: Build source distribution
+  upload_pypi:
+    needs: [build_wheels]
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-
-      - name: Build sdist
-        run: pipx run build --sdist
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: sdist
-          path: dist/*.tar.gz
-
-  publish:
-    name: Publish to ${{ inputs.target || 'pypi' }}
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.target || 'pypi' }}
+    environment: testpypi
     permissions:
       id-token: write
     steps:
       - uses: actions/download-artifact@v8
         with:
+          # unpacks all CIBW artifacts into dist/
+          pattern: cibw-*
           path: dist
           merge-multiple: true
 
-      - name: Publish
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: github.event_name == 'release' && github.event.action == 'published'
         with:
-          repository-url: ${{ inputs.target == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
-          verbose: ${{ inputs.verbose || true }}
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
